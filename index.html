@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitor de Pagos — Veterinaria Aurora Moreno</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f0; color: #1a1a1a; min-height: 100vh; }
+  .topbar { background: #fff; border-bottom: 1px solid #e5e5e0; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+  .topbar-title { font-size: 16px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+  .topbar-title span { font-size: 20px; }
+  .topbar-actions { display: flex; gap: 8px; }
+  .btn { padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; border: 1px solid #d0d0c8; background: #fff; color: #1a1a1a; transition: background 0.15s; white-space: nowrap; }
+  .btn:hover { background: #f0f0eb; }
+  .btn-primary { background: #1a1a1a; color: #fff; border-color: transparent; }
+  .btn-primary:hover { background: #333; }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .container { max-width: 680px; margin: 0 auto; padding: 16px; }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+  .stat-card { background: #fff; border-radius: 10px; padding: 14px; border: 1px solid #e5e5e0; }
+  .stat-label { font-size: 11px; color: #888; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-val { font-size: 22px; font-weight: 500; }
+  .stat-val.danger { color: #c0392b; }
+  .stat-val.warning { color: #d68910; }
+  .stat-val.success { color: #1a7a4a; }
+  .filters { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .filter-btn { padding: 6px 14px; font-size: 12px; border-radius: 999px; border: 1px solid #d0d0c8; background: #fff; color: #666; cursor: pointer; }
+  .filter-btn.active { background: #1a1a1a; color: #fff; border-color: transparent; }
+  .payment-list { display: flex; flex-direction: column; gap: 8px; }
+  .payment-card { background: #fff; border: 1px solid #e5e5e0; border-radius: 12px; padding: 14px 16px; }
+  .payment-card.overdue { border-left: 3px solid #c0392b; border-radius: 0 12px 12px 0; }
+  .payment-card.soon { border-left: 3px solid #d68910; border-radius: 0 12px 12px 0; }
+  .payment-card.paid { opacity: 0.5; }
+  .payment-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .payment-name { font-size: 14px; font-weight: 500; }
+  .payment-sub { font-size: 12px; color: #888; margin-top: 3px; }
+  .payment-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .amount { font-size: 15px; font-weight: 500; }
+  .badge { font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 500; }
+  .badge-danger { background: #fdecea; color: #c0392b; }
+  .badge-warning { background: #fef9e7; color: #d68910; }
+  .badge-info { background: #eaf2fb; color: #1a6fa8; }
+  .badge-success { background: #e9f7ef; color: #1a7a4a; }
+  .check-btn { width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid #ccc; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.15s; flex-shrink: 0; }
+  .check-btn:hover { border-color: #1a7a4a; color: #1a7a4a; }
+  .check-btn.checked { border-color: #1a7a4a; background: #1a7a4a; color: #fff; }
+  .delete-btn { background: none; border: none; cursor: pointer; color: #ccc; font-size: 16px; padding: 2px; line-height: 1; }
+  .delete-btn:hover { color: #c0392b; }
+  .cuotas-bar { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+  .cuota-dot { width: 12px; height: 12px; border-radius: 50%; background: #e0e0d8; cursor: pointer; transition: background 0.15s; }
+  .cuota-dot.paid { background: #1a7a4a; }
+  .cuota-dot.current { background: #d68910; }
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; align-items: center; justify-content: center; padding: 16px; }
+  .overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; padding: 20px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; }
+  .modal h3 { font-size: 16px; font-weight: 500; margin-bottom: 16px; }
+  .form-row { margin-bottom: 12px; }
+  .form-row label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; }
+  .form-row input, .form-row select { width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid #d0d0c8; font-size: 14px; background: #fff; color: #1a1a1a; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cuotas-extra { display: none; }
+  .cuotas-extra.show { display: block; }
+  .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .empty { text-align: center; padding: 40px 20px; color: #aaa; font-size: 14px; }
+  .loading { text-align: center; padding: 40px; color: #aaa; font-size: 14px; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1a1a1a; color: #fff; padding: 10px 20px; border-radius: 8px; font-size: 13px; z-index: 200; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+  .mail-pre { font-size: 12px; color: #444; white-space: pre-wrap; background: #f5f5f0; padding: 12px; border-radius: 8px; max-height: 260px; overflow-y: auto; line-height: 1.6; font-family: monospace; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-title"><span>🐾</span> Veterinaria Aurora Moreno</div>
+  <div class="topbar-actions">
+    <button class="btn btn-sm" onclick="openMail()">✉️ Resumen</button>
+    <button class="btn btn-primary btn-sm" onclick="openModal()">+ Agregar</button>
+  </div>
+</div>
+
+<div class="container">
+  <div id="loading" class="loading">Cargando pagos...</div>
+  <div id="app" style="display:none;">
+    <div class="stats" id="stats"></div>
+    <div class="filters">
+      <button class="filter-btn active" onclick="setFilter('all',this)">Todos</button>
+      <button class="filter-btn" onclick="setFilter('pending',this)">Pendientes</button>
+      <button class="filter-btn" onclick="setFilter('overdue',this)">Vencidos</button>
+      <button class="filter-btn" onclick="setFilter('cuotas',this)">Cuotas</button>
+      <button class="filter-btn" onclick="setFilter('paid',this)">Pagados</button>
+    </div>
+    <div class="payment-list" id="list"></div>
+  </div>
+</div>
+
+<!-- Modal nuevo pago -->
+<div class="overlay" id="modal-overlay">
+  <div class="modal">
+    <h3>Nuevo compromiso</h3>
+    <div class="form-row">
+      <label>Nombre / descripción</label>
+      <input type="text" id="f-nombre" placeholder="Ej: celular Samsung, AFIP...">
+    </div>
+    <div class="form-grid">
+      <div class="form-row">
+        <label>Monto ($)</label>
+        <input type="number" id="f-monto" placeholder="0">
+      </div>
+      <div class="form-row">
+        <label>Tipo</label>
+        <select id="f-tipo" onchange="toggleCuotas()">
+          <option value="single">Pago único</option>
+          <option value="cuotas">En cuotas</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Fecha vencimiento (o 1° cuota)</label>
+      <input type="date" id="f-fecha">
+    </div>
+    <div class="cuotas-extra" id="cuotas-extra">
+      <div class="form-grid">
+        <div class="form-row">
+          <label>Cantidad de cuotas</label>
+          <input type="number" id="f-ncuotas" placeholder="12" min="2">
+        </div>
+        <div class="form-row">
+          <label>Frecuencia</label>
+          <select id="f-freq">
+            <option value="7">Semanal</option>
+            <option value="14">Quincenal</option>
+            <option value="30">Mensual</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row" style="font-size:11px; color:#888;">El monto es por cuota</div>
+    </div>
+    <div class="form-row">
+      <label>Categoría</label>
+      <select id="f-cat">
+        <option value="servicios">Servicios / impuestos</option>
+        <option value="compras">Compras / equipamiento</option>
+        <option value="alquiler">Alquiler</option>
+        <option value="proveedor">Proveedor</option>
+        <option value="personal">Personal / sueldos</option>
+        <option value="otro">Otro</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="savePago()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal mail -->
+<div class="overlay" id="mail-overlay">
+  <div class="modal">
+    <h3>✉️ Resumen para enviar</h3>
+    <div class="mail-pre" id="mail-pre"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="document.getElementById('mail-overlay').classList.remove('open')">Cerrar</button>
+      <button class="btn btn-primary" onclick="abrirGmail()">Abrir en Gmail ↗</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbxnnjqD7X9dTTn_E9SMpDP0pKyfuTYaCZnegAx0WF_loAeZtjg58Y1yzt82v8lvuw3P/exec';
+let pagos = [];
+let filtro = 'all';
+
+// ── utils ─────────────────────────────────────────────────────
+function hoy() { return new Date().toISOString().split('T')[0]; }
+
+function addDias(fecha, dias) {
+  const d = new Date(fecha + 'T00:00:00');
+  d.setDate(d.getDate() + dias);
+  return d.toISOString().split('T')[0];
+}
+
+function diasHasta(fecha) {
+  const hoyD = new Date(); hoyD.setHours(0,0,0,0);
+  const t = new Date(fecha + 'T00:00:00');
+  return Math.round((t - hoyD) / 86400000);
+}
+
+function fmtFecha(f) {
+  if (!f) return '';
+  const [y,m,d] = f.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function fmtARS(n) {
+  return '$' + Math.round(n).toLocaleString('es-AR');
+}
+
+function parseBool(v) { return v === true || v === 'true'; }
+
+function getStatus(p) {
+  if (p.tipo === 'cuotas') {
+    const dates = p.cuotasDates ? p.cuotasDates.split(',') : [];
+    const paid  = p.paidCuotas  ? p.paidCuotas.split(',').map(parseBool) : [];
+    const nextIdx = paid.findIndex(x => !x);
+    if (nextIdx === -1) return 'paid';
+    const d = diasHasta(dates[nextIdx]);
+    if (d < 0) return 'overdue';
+    if (d <= 7) return 'soon';
+    return 'pending';
+  } else {
+    if (parseBool(p.pagado)) return 'paid';
+    const d = diasHasta(p.fecha);
+    if (d < 0) return 'overdue';
+    if (d <= 7) return 'soon';
+    return 'pending';
+  }
+}
+
+// ── fetch helpers ─────────────────────────────────────────────
+function gasGet(params) {
+  const qs = Object.entries(params).map(([k,v])=>`${k}=${encodeURIComponent(v)}`).join('&');
+  return fetch(`${GAS_URL}?${qs}`).then(r => r.json());
+}
+
+// ── cargar datos ──────────────────────────────────────────────
+function cargar() {
+  fetch(`${GAS_URL}?action=getPagos`)
+    .then(r => r.json())
+    .then(d => {
+      pagos = d.pagos || [];
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      render();
+    })
+    .catch(() => {
+      document.getElementById('loading').textContent = 'Error al cargar. Revisá la conexión.';
+    });
+}
+
+// ── render ────────────────────────────────────────────────────
+function render() { renderStats(); renderList(); }
+
+function renderStats() {
+  let totalPend = 0, vencidos = 0, semana = 0, totalPagado = 0;
+  pagos.forEach(p => {
+    const s = getStatus(p);
+    if (s === 'paid') { totalPagado += parseFloat(p.monto)||0; return; }
+    if (p.tipo === 'cuotas') {
+      const dates = p.cuotasDates ? p.cuotasDates.split(',') : [];
+      const paid  = p.paidCuotas  ? p.paidCuotas.split(',').map(parseBool) : [];
+      const ni = paid.findIndex(x => !x);
+      if (ni >= 0) {
+        totalPend += parseFloat(p.monto)||0;
+        const d = diasHasta(dates[ni]);
+        if (d < 0) vencidos++;
+        if (d >= 0 && d <= 7) semana++;
+      }
+    } else {
+      totalPend += parseFloat(p.monto)||0;
+      const d = diasHasta(p.fecha);
+      if (d < 0) vencidos++;
+      if (d >= 0 && d <= 7) semana++;
+    }
+  });
+  document.getElementById('stats').innerHTML = `
+    <div class="stat-card"><div class="stat-label">Pendiente total</div><div class="stat-val">${fmtARS(totalPend)}</div></div>
+    <div class="stat-card"><div class="stat-label">Vencidos</div><div class="stat-val danger">${vencidos}</div></div>
+    <div class="stat-card"><div class="stat-label">Vence esta semana</div><div class="stat-val warning">${semana}</div></div>
+    <div class="stat-card"><div class="stat-label">Pagado (historial)</div><div class="stat-val success">${fmtARS(totalPagado)}</div></div>
+  `;
+}
+
+function renderList() {
+  const order = { overdue:0, soon:1, pending:2, paid:3 };
+  let lista = [...pagos];
+  if (filtro === 'pending') lista = lista.filter(p => ['pending','soon'].includes(getStatus(p)));
+  else if (filtro === 'overdue') lista = lista.filter(p => getStatus(p) === 'overdue');
+  else if (filtro === 'cuotas') lista = lista.filter(p => p.tipo === 'cuotas');
+  else if (filtro === 'paid') lista = lista.filter(p => getStatus(p) === 'paid');
+  lista.sort((a,b) => (order[getStatus(a)]||2) - (order[getStatus(b)]||2));
+
+  const catLabel = { servicios:'Servicios', compras:'Compras', alquiler:'Alquiler', proveedor:'Proveedor', personal:'Personal', otro:'Otro' };
+
+  if (!lista.length) {
+    document.getElementById('list').innerHTML = '<div class="empty">No hay pagos en esta categoría</div>';
+    return;
+  }
+
+  document.getElementById('list').innerHTML = lista.map(p => {
+    const s = getStatus(p);
+    let cardCls = 'payment-card';
+    if (s === 'overdue') cardCls += ' overdue';
+    else if (s === 'soon') cardCls += ' soon';
+    else if (s === 'paid') cardCls += ' paid';
+
+    let badge = '';
+    if (s === 'overdue') badge = '<span class="badge badge-danger">Vencido</span>';
+    else if (s === 'soon') {
+      const d = p.tipo === 'cuotas'
+        ? diasHasta(p.cuotasDates.split(',')[p.paidCuotas.split(',').map(parseBool).findIndex(x=>!x)])
+        : diasHasta(p.fecha);
+      badge = `<span class="badge badge-warning">${d===0?'Hoy':'En '+d+'d'}</span>`;
+    } else if (s === 'paid') badge = '<span class="badge badge-success">Pagado</span>';
+    else {
+      const d = p.tipo === 'cuotas'
+        ? diasHasta(p.cuotasDates.split(',')[p.paidCuotas.split(',').map(parseBool).findIndex(x=>!x)])
+        : diasHasta(p.fecha);
+      badge = `<span class="badge badge-info">En ${d}d</span>`;
+    }
+
+    let sub = catLabel[p.cat] || 'Otro';
+    let cuotasHtml = '';
+    let dateInfo = '';
+
+    if (p.tipo === 'cuotas') {
+      const dates = p.cuotasDates ? p.cuotasDates.split(',') : [];
+      const paid  = p.paidCuotas  ? p.paidCuotas.split(',').map(parseBool) : [];
+      const paidCount = paid.filter(Boolean).length;
+      sub += ` · Cuota ${paidCount+1}/${p.cuotasTotal}`;
+      const ni = paid.findIndex(x=>!x);
+      if (ni >= 0) dateInfo = ` · Próx: ${fmtFecha(dates[ni])}`;
+      cuotasHtml = `<div class="cuotas-bar">` +
+        dates.map((dt,i) => {
+          let cls = 'cuota-dot';
+          if (paid[i]) cls += ' paid';
+          else if (i === paid.findIndex(x=>!x)) cls += ' current';
+          return `<div class="${cls}" title="Cuota ${i+1} — ${fmtFecha(dt)}" onclick="toggleCuota('${p.id}',${i})"></div>`;
+        }).join('') + '</div>';
+    } else {
+      dateInfo = ` · ${fmtFecha(p.fecha)}`;
+    }
+
+    const chkCls = 'check-btn' + (s==='paid'?' checked':'');
+    return `
+      <div class="${cardCls}">
+        <div class="payment-row">
+          <div style="flex:1;min-width:0;">
+            <div class="payment-name">${p.nombre}</div>
+            <div class="payment-sub">${sub}${dateInfo}</div>
+            ${cuotasHtml}
+          </div>
+          <div class="payment-right">
+            ${badge}
+            <span class="amount">${fmtARS(p.monto)}</span>
+            ${p.tipo==='single'?`<button class="${chkCls}" onclick="togglePagado('${p.id}',${s==='paid'})">✓</button>`:''}
+            <button class="delete-btn" onclick="eliminar('${p.id}')">✕</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── acciones ──────────────────────────────────────────────────
+function togglePagado(id, esPagado) {
+  const nuevoPagado = !esPagado;
+  gasGet({ action:'updatePago', id, pagado: nuevoPagado })
+    .then(() => {
+      const p = pagos.find(x => x.id == id);
+      if (p) p.pagado = nuevoPagado ? 'true' : 'false';
+      render();
+      toast(nuevoPagado ? '✓ Marcado como pagado' : 'Desmarcado');
+    });
+}
+
+function toggleCuota(id, idx) {
+  const p = pagos.find(x => x.id == id);
+  if (!p) return;
+  const paid = p.paidCuotas ? p.paidCuotas.split(',').map(x => x==='true') : [];
+  paid[idx] = !paid[idx];
+  const newVal = paid.map(x=>x?'true':'false').join(',');
+  gasGet({ action:'updatePago', id, paidCuotas: newVal })
+    .then(() => { p.paidCuotas = newVal; render(); toast('Cuota actualizada'); });
+}
+
+function eliminar(id) {
+  if (!confirm('¿Eliminar este pago?')) return;
+  gasGet({ action:'deletePago', id })
+    .then(() => { pagos = pagos.filter(x => x.id != id); render(); toast('Eliminado'); });
+}
+
+// ── agregar pago ──────────────────────────────────────────────
+function openModal() {
+  document.getElementById('f-nombre').value = '';
+  document.getElementById('f-monto').value = '';
+  document.getElementById('f-fecha').value = hoy();
+  document.getElementById('f-tipo').value = 'single';
+  document.getElementById('f-ncuotas').value = '';
+  document.getElementById('f-freq').value = '7';
+  document.getElementById('f-cat').value = 'servicios';
+  document.getElementById('cuotas-extra').classList.remove('show');
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+
+function toggleCuotas() {
+  const t = document.getElementById('f-tipo').value;
+  document.getElementById('cuotas-extra').classList.toggle('show', t === 'cuotas');
+}
+
+function savePago() {
+  const nombre = document.getElementById('f-nombre').value.trim();
+  const monto  = document.getElementById('f-monto').value;
+  const tipo   = document.getElementById('f-tipo').value;
+  const fecha  = document.getElementById('f-fecha').value;
+  const cat    = document.getElementById('f-cat').value;
+  if (!nombre || !fecha) { alert('Completá nombre y fecha'); return; }
+
+  const params = { action:'savePago', nombre, monto: monto||0, tipo, fecha, cat };
+
+  if (tipo === 'cuotas') {
+    const n    = parseInt(document.getElementById('f-ncuotas').value) || 4;
+    const freq = parseInt(document.getElementById('f-freq').value) || 7;
+    const dates = Array.from({length:n}, (_,i) => addDias(fecha, i*freq));
+    params.cuotasTotal = n;
+    params.freq        = freq;
+    params.cuotasDates = dates.join(',');
+    params.paidCuotas  = Array(n).fill('false').join(',');
+  }
+
+  const btn = document.querySelector('#modal-overlay .btn-primary');
+  btn.textContent = 'Guardando...'; btn.disabled = true;
+
+  gasGet(params).then(r => {
+    if (r.ok) {
+      params.id = r.id;
+      params.pagado = 'false';
+      pagos.push(params);
+      render();
+      closeModal();
+      toast('✓ Pago guardado');
+    } else { alert('Error: ' + r.error); }
+    btn.textContent = 'Guardar'; btn.disabled = false;
+  });
+}
+
+// ── mail ──────────────────────────────────────────────────────
+function openMail() {
+  const vencidos = pagos.filter(p => getStatus(p) === 'overdue');
+  const semana   = pagos.filter(p => getStatus(p) === 'soon');
+  const proximos = pagos.filter(p => getStatus(p) === 'pending');
+  let txt = `RESUMEN DE PAGOS — Veterinaria Aurora Moreno\nFecha: ${fmtFecha(hoy())}\n\n`;
+  if (vencidos.length) {
+    txt += '⚠️ VENCIDOS\n';
+    vencidos.forEach(p => txt += `  • ${p.nombre} — ${fmtARS(p.monto)}\n`);
+    txt += '\n';
+  }
+  if (semana.length) {
+    txt += '🔔 VENCEN ESTA SEMANA\n';
+    semana.forEach(p => {
+      const f = p.tipo==='cuotas' ? p.cuotasDates.split(',')[p.paidCuotas.split(',').map(x=>x==='true').findIndex(x=>!x)] : p.fecha;
+      txt += `  • ${p.nombre} — ${fmtARS(p.monto)} — ${fmtFecha(f)}\n`;
+    });
+    txt += '\n';
+  }
+  if (proximos.length) {
+    txt += '📋 PRÓXIMOS\n';
+    proximos.forEach(p => {
+      const f = p.tipo==='cuotas' ? p.cuotasDates.split(',')[p.paidCuotas.split(',').map(x=>x==='true').findIndex(x=>!x)] : p.fecha;
+      txt += `  • ${p.nombre} — ${fmtARS(p.monto)} — ${fmtFecha(f)}\n`;
+    });
+  }
+  document.getElementById('mail-pre').textContent = txt;
+  document.getElementById('mail-overlay').classList.add('open');
+}
+
+function abrirGmail() {
+  const body = document.getElementById('mail-pre').textContent;
+  const url = `https://mail.google.com/mail/?view=cm&to=veterinariauroramoreno@gmail.com&su=${encodeURIComponent('Resumen pagos — Veterinaria Aurora Moreno')}&body=${encodeURIComponent(body)}`;
+  window.open(url, '_blank');
+}
+
+// ── filtro ────────────────────────────────────────────────────
+function setFilter(f, btn) {
+  filtro = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderList();
+}
+
+// ── toast ─────────────────────────────────────────────────────
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+cargar();
+</script>
+</body>
+</html>
