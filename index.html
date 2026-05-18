@@ -182,15 +182,33 @@ function addDias(fecha, dias) {
   return d.toISOString().split('T')[0];
 }
 
+function normFecha(f) {
+  if (!f) return '';
+  f = f.toString().trim();
+  // Si ya es YYYY-MM-DD, devolver tal cual
+  if (/^\d{4}-\d{2}-\d{2}$/.test(f)) return f;
+  // Si es un objeto Date serializado o cualquier otro formato, parsear
+  const d = new Date(f);
+  if (!isNaN(d)) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const dd = String(d.getDate()).padStart(2,'0');
+    return `${y}-${m}-${dd}`;
+  }
+  return f;
+}
+
 function diasHasta(fecha) {
+  const f = normFecha(fecha);
   const hoyD = new Date(); hoyD.setHours(0,0,0,0);
-  const t = new Date(fecha + 'T00:00:00');
+  const t = new Date(f + 'T00:00:00');
   return Math.round((t - hoyD) / 86400000);
 }
 
 function fmtFecha(f) {
   if (!f) return '';
-  const [y,m,d] = f.split('-');
+  const n = normFecha(f);
+  const [y,m,d] = n.split('-');
   return `${d}/${m}/${y}`;
 }
 
@@ -230,7 +248,11 @@ function cargar() {
   fetch(`${GAS_URL}?action=getPagos`)
     .then(r => r.json())
     .then(d => {
-      pagos = d.pagos || [];
+      pagos = (d.pagos || []).map(p => ({
+        ...p,
+        fecha: normFecha(p.fecha),
+        cuotasDates: p.cuotasDates ? p.cuotasDates.split(',').map(normFecha).join(',') : ''
+      }));
       document.getElementById('loading').style.display = 'none';
       document.getElementById('app').style.display = 'block';
       render();
